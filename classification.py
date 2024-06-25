@@ -18,6 +18,13 @@ num_of_splits = 3           #Number of splits in the cross validation
 number_of_repeats = None    #If using RepeatedKFold, use this to set the number of repeats
 no_weights_exist = False    #Set to True if you want to recreate the model everytime
 
+## Create parse argues ##
+parser = argparse.ArgumentParser(description = 'Select between training and categorizing')
+group = parser.add_mutually_exclusive_group()
+group.add_argument('-t', '--train', action='store_true', help='Train the model on the current training data.')
+group.add_argument('-c', '--categorize', action='store_true', help='Categorize unknown data to make new training data')
+args = parser.parse_args()
+
 
 def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion, optimizer, num_epochs):
     # Train the model for the specified number of epochs
@@ -96,99 +103,86 @@ else:
     print("Previous model found, loading HM_model")
     model  = torch.load('HM_model.pth')
 
+###### Training #######
+if args.train:
+
+    #set up cross-validation
+    kf = K_Fold(n_splits = num_of_splits) #n_repeats = 5,
+
+    #Freeze all the pre-trained layers
+    for param in model.parameters():
+        param.requires_grad = False
+
+    #Modify the last layer of the model
+    num_classes = 13
+    model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+
+    from torchvision.datasets import ImageFolder
+    from torchvision.transforms import transforms
+
+    # Define the transformations to apply to the images
+    transform = transforms.Compose([ 
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) #This changes the pixel to have mean of 0 and a std of 1. We will probably need to change this for our dataset. subtract the mean and divide by the std.
+    ])
 
 
-#set up cross-validation
-kf = K_Fold(n_splits = num_of_splits) #n_repeats = 5,
+    #Load the dataset
+    dataset = ImageFolder('Training_Data', transform=transform)
 
-#Freeze all the pre-trained layers
-for param in model.parameters():
-    param.requires_grad = False
-
-#Modify the last layer of the model
-num_classes = 13
-model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
-
-from torchvision.datasets import ImageFolder
-from torchvision.transforms import transforms
-
-# Define the transformations to apply to the images
-transform = transforms.Compose([ 
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) #This changes the pixel to have mean of 0 and a std of 1. We will probably need to change this for our dataset. subtract the mean and divide by the std.
-])
+    # Set the device
+    print("Cuda Found: " + str(torch.cuda.is_available()))
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
 
 
-# Load the train and validation datasets
-# train_dataset = ImageFolder('Training_Data', transform=transform)
-# val_dataset = ImageFolder('custom_dataset/val', transform=transform)
+    # Define the loss function and optimizer
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.fc.parameters(), lr=learning_rate, momentum=0.9)
 
 
+    #Cross_Validation
+    for fold, (train_index,val_index) in enumerate(kf.split(dataset)):
+        print(f'Fold {fold + 1}')
 
+        #Create the train and the evaluate subsets from the cross-validation split
+        train_subset = Subset(dataset, train_index)
+        val_subset = Subset(dataset, val_index)
 
+        # Create data loaders
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
-# Create data loaders for the train and validation datasets
-# train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-# val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+        train(model, train_loader, val_loader, train_subset, val_subset, criterion, optimizer, num_epochs=num_epochs)
 
-#Load the dataset
-dataset = ImageFolder('Training_Data', transform=transform)
+    # Unfreeze all the layers and fine-tune the entire network for a few more epochs
+    for param in model.parameters():
+        param.requires_grad = True
 
-# Set the device
-print("Cuda Found: " + str(torch.cuda.is_available()))
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model.to(device)
+    # Fine-tune the last layer for a few epochs
+    for fold, (train_index,val_index) in enumerate(kf.split(dataset)):
+        print(f'Fold {fold + 1}')
 
+        #Create the train and the evaluate subsets from the cross-validation split
+        train_subset = Subset(dataset, train_index)
+        val_subset = Subset(dataset, val_index)
 
-# Define the loss function and optimizer
-criterion = torch.nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.fc.parameters(), lr=learning_rate, momentum=0.9)
+        # Create data loaders
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
+        train(model, train_loader, val_loader, train_subset, val_subset, criterion, optimizer, num_epochs=num_epochs)
 
-#Cross_Validation
-for fold, (train_index,val_index) in enumerate(kf.split(dataset)):
-    print(f'Fold {fold + 1}')
+    if no_weights_exist:
+        torch.save(model, 'HM_model.pth')
 
-    #Create the train and the evaluate subsets from the cross-validation split
-    train_subset = Subset(dataset, train_index)
-    val_subset = Subset(dataset, val_index)
-
-    # Create data loaders
-    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
-
-    train(model, train_loader, val_loader, train_subset, val_subset, criterion, optimizer, num_epochs=num_epochs)
-
-
-
-
-
-
-# Fine-tune the last layer for a few epochs
-# optimizer = torch.optim.SGD(model.fc.parameters(), lr=0.01, momentum=0.9)
-# train(model, train_loader, val_loader, criterion, optimizer, num_epochs=5)
-
-# Unfreeze all the layers and fine-tune the entire network for a few more epochs
-for param in model.parameters():
-    param.requires_grad = True
-# optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-# train(model, train_loader, val_loader, criterion, optimizer, num_epochs=10)
-for fold, (train_index,val_index) in enumerate(kf.split(dataset)):
-    print(f'Fold {fold + 1}')
-
-    #Create the train and the evaluate subsets from the cross-validation split
-    train_subset = Subset(dataset, train_index)
-    val_subset = Subset(dataset, val_index)
-
-    # Create data loaders
-    train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
-
-    train(model, train_loader, val_loader, train_subset, val_subset, criterion, optimizer, num_epochs=num_epochs)
-
-if no_weights_exist:
-    torch.save(model, 'HM_model.pth')
+###### Categorizing ######
+if args.categorize:
+    # Set the model to evaluate mode and disable the tensor.backward() call
+    model.eval()
+    torch.no_grad()
+    
 
 
