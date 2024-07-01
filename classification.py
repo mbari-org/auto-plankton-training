@@ -2,9 +2,10 @@
 #https://alirezasamar.com/blog/2023/03/fine-tuning-pre-trained-resnet-18-model-image-classification-pytorch/
 import os
 import argparse
+import time
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import KFold as K_Fold  #RepeatedKFold
+from sklearn.model_selection import RepeatedKFold as K_Fold  #RepeatedKFold
 import torch
 import torchvision.models as models 
 from torchvision import datasets, transforms
@@ -13,16 +14,21 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 from torchvision.transforms import transforms
 from PIL import Image
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as pltz
+
+from EarlyStopping import EarlyStopping
 
 ####Modifiable variables#######
+
 batch_size = 64
-num_epochs = 5
+num_epochs = 100
 num_classes = 13
 learning_rate = 0.01
-num_of_splits = 3           #Number of splits in the cross validation
-number_of_repeats = None    #If using RepeatedKFold, use this to set the number of repeats
-no_weights_exist = False    #Set to True if you want to recreate the model everytime
+num_of_splits = 10           #Number of splits in the cross validation
+num_of_repeats = 5    #If using RepeatedKFold, use this to set the number of repeats
+remake_model = False    #Set to True if you want to recreate the model everytime
+patience = 7            #Early Stopping patience
+min_delta = 0.001       #The amount of change require to not early stop.
 labels_map = {
     0: "Aggregate",
     1: "Blurry",
@@ -40,6 +46,8 @@ labels_map = {
 }
 
 
+#model = None
+
 ## Create parse argues ##
 parser = argparse.ArgumentParser(description = 'Select between training and categorizing')
 group = parser.add_mutually_exclusive_group()
@@ -47,15 +55,65 @@ group.add_argument('-t', '--train', action='store_true', help='Train the model o
 group.add_argument('-c', '--categorize', action='store_true', help='Categorize unknown data to make new training data')
 args = parser.parse_args()
 
-def imshow(img):
-    npimg = img.numpy()
-    plt.imshow(np.transpose(npimg, (1,2,0)))
-    plt.show()
+# def imshow(img):
+#     npimg = img.numpy()
+#     plt.imshow(np.transpose(npimg, (1,2,0)))
+#     plt.show()
 
-def create_image_csv(dataset):
-    df = pd.DataFrame
+def create_image_csv():
+    print("Saving CSV")
+
+    folder_path = 'Training_Data'
+    data = {
+        "image": [],
+        "label": []
+    }
+    #loop through training_data to see all the training dirs, then loop through the training dirs to get all the images. Then save image file name and it's file label in a csv.
+    for dirs in os.listdir(folder_path):
+        working_dir = os.path.join(folder_path, dirs)
+        for files in os.listdir(working_dir):
+            data["image"].append(files)
+            data["label"].append(dirs)
+
+    df = pd.DataFrame(data)
+    # This creates the csv name: ISO date format
+    filename = time.strftime("%Y-%m-%dT%H:%M.csv", time.gmtime())
+    directory_name=time.strftime("%Y-%m-%d", time.gmtime())
+
+    # Try to save the CSV, If you can't, error out.
+    try:
+        path = os.path.join("History", "CSVs")
+        path = os.path.join(os.path.join(path, directory_name))
+        os.makedirs(path, exist_ok = True)
+        df.to_csv(os.path.join(path, filename), header=False, index=False)
+    except OSError as error:
+        print(error)
+
+def save_model(model):
+    torch.save(model, 'HM_model.pth')
+    # This creates the csv name: ISO date format
+    filename = time.strftime("%Y-%m-%dT%H:%M_Model.pth", time.gmtime())
+    directory_name=time.strftime("%Y-%m-%d", time.gmtime())
+
+    # Try to save the CSV, If you can't, error out.
+    try:
+        path = os.path.join("History", "Models")
+        path = os.path.join(os.path.join(path, directory_name))
+        os.makedirs(path, exist_ok = True)
+        torch.save(model, os.path.join(path, filename))
+    except OSError as error:
+        print(error)
+
 
 def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion, optimizer, num_epochs):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    model.to(device)
+
+    # Create early stopping
+    early_stopping = EarlyStopping(patience = patience, verbose = True, delta = min_delta)
+
+
     # Train the model for the specified number of epochs
     for epoch in range(num_epochs):
         # Set the model to train mode
@@ -63,7 +121,7 @@ def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion
 
         # Initialize the running loss and accuracy
         running_loss = 0.0
-        running_corrects = 0
+        running_corrects = 0        
 
         # Iterate over the batches of the train loader
         for inputs, labels in train_loader:
@@ -117,8 +175,6 @@ def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion
                 # print("The output was: " +  str(preds) + "\nAnd the label was: " + str(labels) + "\n")
 
 
-
-
         # Calculate the validation loss and accuracy
         val_loss = running_loss / len(val_dataset)
         val_acc = running_corrects.double() / len(val_dataset)
@@ -129,15 +185,25 @@ def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion
 
         
 
+        if early_stopping(val_loss, model):
+            print("\nEarly Stopping Here\n")
+            break
+
+
+    model = early_stopping.load_checkpoint(model).to(device)
+
+        
+
 
 #Load the resnet18 model on first run unless a pre-run model is found
-if (not os.path.exists('HM_model.pth')):
+if (not os.path.exists('HM_model.pth') or remake_model):
     print("Previous model does not exist, loading resnet18")
     model = models.resnet18(weights='DEFAULT')#, weights='HM_weights')
-    no_weights_exist = True
 else:
     print("Previous model found, loading HM_model")
-    model  = torch.load('HM_model.pth')
+    model = models.resnet18(weights='DEFAULT')#, weights='HM_weights')
+    model = torch.load('HM_model.pth')
+    print(model)
 
 
 
@@ -158,7 +224,7 @@ model.to(device)
 if args.train:
 
     #set up cross-validation
-    kf = K_Fold(n_splits = num_of_splits) #n_repeats = 5,
+    kf = K_Fold(n_splits = num_of_splits, n_repeats = num_of_repeats) #n_repeats = 5,
 
     #Freeze all the pre-trained layers
     for param in model.parameters():
@@ -169,9 +235,6 @@ if args.train:
 
     #Load the dataset
     dataset = ImageFolder(root = 'Training_Data', transform=transform)
-
-    
-
 
     # Define the loss function and optimizer
     criterion = torch.nn.CrossEntropyLoss()
@@ -210,8 +273,9 @@ if args.train:
 
         train(model, train_loader, val_loader, train_subset, val_subset, criterion, optimizer, num_epochs=num_epochs)
 
-    if no_weights_exist:
-        torch.save(model, 'HM_model.pth')
+    
+    create_image_csv()
+    save_model(model)
 
 ###### Categorizing ######
 elif args.categorize:
@@ -243,27 +307,7 @@ elif args.categorize:
         print(f'Saved {img_name} to {label_folder}')
 
 else:
-    print("Exploring dataset")
-
-    #Load the dataset
-    dataset = ImageFolder(root = 'Training_Data')
-    data = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    
-
-
-    #https://pytorch.org/tutorials/beginner/basics/data_tutorial.html?highlight=dataset
-    # Test to see how to access dataset matterial
-    figure = plt.figure(figsize=(8, 8))
-    cols, rows = 3, 3
-    for i in range(1, cols * rows + 1):
-        sample_idx = torch.randint(len(dataset), size=(1,)).item()
-        img, label = dataset[sample_idx]
-        figure.add_subplot(rows, cols, i)
-        plt.title(labels_map[label])
-        plt.axis("off")
-        plt.imshow(img, cmap="gray")
-    plt.show()
-
+    print("error: select train or caregorize.")
 
 
 
