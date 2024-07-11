@@ -1,6 +1,7 @@
 #Add CSV creating script that will record image names and it's label. Also can make a copy model. Image to vec
 #https://alirezasamar.com/blog/2023/03/fine-tuning-pre-trained-resnet-18-model-image-classification-pytorch/
 import os
+
 import argparse
 import time
 import numpy as np
@@ -21,31 +22,49 @@ from EarlyStopping import EarlyStopping
 ####Modifiable variables#######
 
 batch_size = 64
-num_epochs = 100
-num_classes = 13
+num_epochs = 1000
+
 learning_rate = 0.01
-num_of_splits = 10           #Number of splits in the cross validation
+num_of_splits = 25           #Number of splits in the cross validation
 num_of_repeats = 5    #If using RepeatedKFold, use this to set the number of repeats
 remake_model = False    #Set to True if you want to recreate the model everytime
-patience = 7            #Early Stopping patience
-min_delta = 0.001       #The amount of change require to not early stop.
+patience = 10            #Early Stopping patience
+min_delta = 0.0       #The amount of change require to not early stop.
 labels_map = {
     0: "Aggregate",
-    1: "Blurry",
-    2: "Camera_Ring",
-    3: "Ciliate",
-    4: "Copepod",
-    5: "Diatom:_Long_Chain",
-    6: "Diatom:_Long_Single",
-    7: "Diatom:_Spike_Chain",
-    8: "Diatom:_Sprial_Chain",
-    9: "Diatom:_Square_Single",
-    10: "Dinoflagellate:_Circles",
-    11: "Dinoflagellate:_Horns",
-    12: "Phaeocystis"
+    1: "Bad_Mask",
+    2: "Blurry",
+	3: "Camera_Ring",
+    4: "Ciliate",
+    5: "Copepod",
+    6: "Diatom:_Long_Chain",
+    7: "Diatom:_Long_Single",
+    8: "Diatom:_Spike_Chain",
+    9: "Diatom:_Sprial_Chain",
+    10: "Diatom:_Square_Single",
+    11: "Dinoflagellate:_Circles",
+    12: "Dinoflagellate:_Horns",
+    13: "Phaeocystis",
+    14: "Radiolaria"
 }
-
-
+label_count = {
+	"Aggregate": 0,
+	"Bad_Mask":	0,
+    "Blurry": 0,
+    "Camera_Ring": 0,
+    "Ciliate": 0,
+    "Copepod": 0,
+    "Diatom:_Long_Chain": 0,
+    "Diatom:_Long_Single": 0,
+    "Diatom:_Spike_Chain": 0,
+    "Diatom:_Sprial_Chain": 0,
+    "Diatom:_Square_Single": 0,
+    "Dinoflagellate:_Circles": 0,
+    "Dinoflagellate:_Horns": 0,
+    "Phaeocystis": 0,
+    "Radiolaria": 0
+}
+num_classes = len(labels_map)
 #model = None
 
 ## Create parse argues ##
@@ -55,10 +74,6 @@ group.add_argument('-t', '--train', action='store_true', help='Train the model o
 group.add_argument('-c', '--categorize', action='store_true', help='Categorize unknown data to make new training data')
 args = parser.parse_args()
 
-# def imshow(img):
-#     npimg = img.numpy()
-#     plt.imshow(np.transpose(npimg, (1,2,0)))
-#     plt.show()
 
 def create_image_csv():
     print("Saving CSV")
@@ -83,11 +98,43 @@ def create_image_csv():
     # Try to save the CSV, If you can't, error out.
     try:
         path = os.path.join("History", "CSVs")
-        path = os.path.join(os.path.join(path, directory_name))
+        path = os.path.join(path, directory_name)
         os.makedirs(path, exist_ok = True)
         df.to_csv(os.path.join(path, filename), header=False, index=False)
     except OSError as error:
         print(error)
+
+def create_cat_count_csv():
+	folder_path = 'Categorized_Data'
+	data = {
+		"data":	{	"image": [],
+					"label": []
+					},
+		"label_count": {	"label": labels_map.values(),
+							"count": label_count.values()
+						}
+	}
+	#loop through training_data to see all the training dirs, then loop through the training dirs to get all the images. Then save image file name and it's file label in a csv.
+	for dirs in os.listdir(folder_path):
+		working_dir = os.path.join(folder_path, dirs)
+		for files in os.listdir(working_dir):
+			data["data"]["image"].append(files)
+			data["data"]["label"].append(dirs)
+
+	df = pd.DataFrame(data)
+	# This creates the csv name: ISO date format
+	filename = time.strftime("%Y-%m-%dT%H:%M.csv", time.gmtime())
+	directory_name=time.strftime("%Y-%m-%d", time.gmtime())
+	try:
+		path = os.path.join("History", "Categorize_CSVs")
+		path = os.path.join(path, directory_name)
+		os.makedirs(path, exist_ok = True)
+		#df = pd.DataFrame.from_dict(label_count, orient="index")
+		df = df.T
+		df.to_csv(os.path.join(path, filename), header=False, index=False)
+	except OSError as error:
+		print(error)
+    
 
 def save_model(model):
     torch.save(model, 'HM_model.pth')
@@ -203,7 +250,7 @@ else:
     print("Previous model found, loading HM_model")
     model = models.resnet18(weights='DEFAULT')#, weights='HM_weights')
     model = torch.load('HM_model.pth')
-    print(model)
+    #print(model)
 
 
 
@@ -296,6 +343,7 @@ elif args.categorize:
 
         ## Using the label map defined at the top for the folder names for the labels.
         predicted_label = labels_map[predicted_label]
+        label_count[predicted_label] += 1 
         
         # Create folder if it doesn't exist
         label_folder = os.path.join('Categorized_Data', predicted_label)
@@ -305,9 +353,9 @@ elif args.categorize:
         destination_path = os.path.join(label_folder, img_name)
         os.rename(img_path, destination_path)
         print(f'Saved {img_name} to {label_folder}')
+    print(label_count)
+    create_cat_count_csv()
 
 else:
-    print("error: select train or caregorize.")
-
-
-
+	print(labels_map.values())
+	print("error: select train or caregorize.")
