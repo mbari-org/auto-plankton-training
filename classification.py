@@ -1,3 +1,4 @@
+#Author: Steven Patrick
 #Add CSV creating script that will record image names and it's label. Also can make a copy model. Image to vec
 #https://alirezasamar.com/blog/2023/03/fine-tuning-pre-trained-resnet-18-model-image-classification-pytorch/
 import os
@@ -23,10 +24,9 @@ from EarlyStopping import EarlyStopping
 
 batch_size = 64
 num_epochs = 1000
-
 learning_rate = 0.01
-num_of_splits = 25           #Number of splits in the cross validation
-num_of_repeats = 5    #If using RepeatedKFold, use this to set the number of repeats
+num_of_splits = 5           #Number of splits in the cross validation
+num_of_repeats = 1    #If using RepeatedKFold, use this to set the number of repeats
 remake_model = False    #Set to True if you want to recreate the model everytime
 patience = 10            #Early Stopping patience
 min_delta = 0.0       #The amount of change require to not early stop.
@@ -34,33 +34,33 @@ labels_map = {
     0: "Aggregate",
     1: "Bad_Mask",
     2: "Blurry",
-	3: "Camera_Ring",
+    3: "Camera_Ring",
     4: "Ciliate",
     5: "Copepod",
-    6: "Diatom:_Long_Chain",
-    7: "Diatom:_Long_Single",
-    8: "Diatom:_Spike_Chain",
-    9: "Diatom:_Sprial_Chain",
-    10: "Diatom:_Square_Single",
-    11: "Dinoflagellate:_Circles",
-    12: "Dinoflagellate:_Horns",
+    6: "Diatom_Long_Chain",
+    7: "Diatom_Long_Single",
+    8: "Diatom_Spike_Chain",
+    9: "Diatom_Sprial_Chain",
+    10: "Diatom_Square_Single",
+    11: "Dinoflagellate_Circles",
+    12: "Dinoflagellate_Horns",
     13: "Phaeocystis",
     14: "Radiolaria"
 }
 label_count = {
-	"Aggregate": 0,
-	"Bad_Mask":	0,
+    "Aggregate": 0,
+    "Bad_Mask": 0,
     "Blurry": 0,
     "Camera_Ring": 0,
     "Ciliate": 0,
     "Copepod": 0,
-    "Diatom:_Long_Chain": 0,
-    "Diatom:_Long_Single": 0,
-    "Diatom:_Spike_Chain": 0,
-    "Diatom:_Sprial_Chain": 0,
-    "Diatom:_Square_Single": 0,
-    "Dinoflagellate:_Circles": 0,
-    "Dinoflagellate:_Horns": 0,
+    "Diatom_Long_Chain": 0,
+    "Diatom_Long_Single": 0,
+    "Diatom_Spike_Chain": 0,
+    "Diatom_Sprial_Chain": 0,
+    "Diatom_Square_Single": 0,
+    "Dinoflagellate_Circles": 0,
+    "Dinoflagellate_Horns": 0,
     "Phaeocystis": 0,
     "Radiolaria": 0
 }
@@ -107,12 +107,12 @@ def create_image_csv():
 def create_cat_count_csv():
 	folder_path = 'Categorized_Data'
 	data = {
-		"data":	{	"image": [],
-					"label": []
-					},
-		"label_count": {	"label": labels_map.values(),
-							"count": label_count.values()
-						}
+		"data": {"image": [],
+			"label": []
+			},
+		"label_count": {"label": labels_map.values(),
+				"count": label_count.values()
+		}
 	}
 	#loop through training_data to see all the training dirs, then loop through the training dirs to get all the images. Then save image file name and it's file label in a csv.
 	for dirs in os.listdir(folder_path):
@@ -203,7 +203,7 @@ def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion
         running_loss = 0.0
         running_corrects = 0
 
-        # Iterate over the batches of the validation loader
+        # Iterate oHM_model_over_night.pthver the batches of the validation loader
         with torch.no_grad():
             for inputs, labels in val_loader:
                 # Move the inputs and labels to the device
@@ -246,10 +246,14 @@ def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion
 if (not os.path.exists('HM_model.pth') or remake_model):
     print("Previous model does not exist, loading resnet18")
     model = models.resnet18(weights='DEFAULT')#, weights='HM_weights')
+    #Modify the last layer of the model
+    model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 else:
     print("Previous model found, loading HM_model")
     model = models.resnet18(weights='DEFAULT')#, weights='HM_weights')
-    model = torch.load('HM_model.pth')
+    #Modify the last layer of the model
+    model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
+    model.load_state_dict(torch.load('HM_model.pth'))
     #print(model)
 
 
