@@ -1,35 +1,68 @@
-#Author: Steven Patrick
-#Add CSV creating script that will record image names and it's label. Also can make a copy model. Image to vec
-#https://alirezasamar.com/blog/2023/03/fine-tuning-pre-trained-resnet-18-model-image-classification-pytorch/
-import os
+"""
+Author: Steven Patrick
+Description:
+    This script handles two main functionalities: training a model using a pre-trained ResNet-18 and categorizing images into classes using a trained model. 
+    Additionally, it allows creating CSV files to track image filenames and their corresponding labels. The script supports early stopping and cross-validation.
+    
+    The two main functionalities:
+    1. Training:
+        - Uses cross-validation and early stopping.
+        - Trains the last fully connected layer of a pre-trained ResNet-18 model.
+        - Optionally fine-tunes the entire network.
+        - Tracks the training and validation accuracy and loss.
+        - Saves a model checkpoint and the best-performing model.
+        - Outputs the results in a CSV format for later inspection.
+    2. Categorizing:
+        - Classifies images in the 'New_Data' folder into categories.
+        - Moves images to a folder based on the predicted class.
+        - Keeps track of the count of images per category and exports it as a CSV.
+        
+    Additional Features:
+        - Early stopping to avoid overfitting during training.
+        - Option to reload a saved model or start from scratch.
+        - CSV logging for the images and their labels, as well as a count of images in each category.
+    
+    To use the script:
+        - Run with the argument `-t` or `--train` to train the model.
+        - Run with the argument `-c` or `--categorize` to categorize images.
+        - The script will automatically detect if a saved model exists and load it, unless you set the `remake_model` variable to True.
+        - CSVs will be created in the "History" directory, organized by date.
+    
+Reference:
+    Fine-tuning a pre-trained ResNet-18 model for image classification using PyTorch:
+    https://alirezasamar.com/blog/2023/03/fine-tuning-pre-trained-resnet-18-model-image-classification-pytorch/
 
+"""
+
+import os
 import argparse
 import time
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import RepeatedKFold as K_Fold  #RepeatedKFold
+from sklearn.model_selection import RepeatedKFold as K_Fold
 import torch
-import torchvision.models as models 
+import torchvision.models as models
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
-from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
-from torchvision.transforms import transforms
 from PIL import Image
-import matplotlib.pyplot as pltz
+import matplotlib.pyplot as plt
 
-from EarlyStopping import EarlyStopping
+from earlystopping import EarlyStopping
 
-####Modifiable variables#######
+#### Modifiable variables ####
 
-batch_size = 64
-num_epochs = 1000
-learning_rate = 0.01
-num_of_splits = 5           #Number of splits in the cross validation
-num_of_repeats = 1    #If using RepeatedKFold, use this to set the number of repeats
-remake_model = False    #Set to True if you want to recreate the model everytime
-patience = 10            #Early Stopping patience
-min_delta = 0.0       #The amount of change require to not early stop.
+# Training parameters
+batch_size = 64  # Batch size for DataLoader
+num_epochs = 1000  # Maximum number of epochs to train
+learning_rate = 0.01  # Learning rate for optimizer
+num_of_splits = 5  # Number of splits in K-fold cross-validation
+num_of_repeats = 1  # Number of times K-fold cross-validation is repeated
+remake_model = False  # Set to True if a new model is to be trained every time
+patience = 10  # Early stopping patience (number of epochs without improvement)
+min_delta = 0.0  # Minimum delta for improvement to reset early stopping counter
+
+# Label mapping (class labels)
 labels_map = {
     0: "Aggregate",
     1: "Bad_Mask",
@@ -47,35 +80,21 @@ labels_map = {
     13: "Phaeocystis",
     14: "Radiolaria"
 }
-label_count = {
-    "Aggregate": 0,
-    "Bad_Mask": 0,
-    "Blurry": 0,
-    "Camera_Ring": 0,
-    "Ciliate": 0,
-    "Copepod": 0,
-    "Diatom_Long_Chain": 0,
-    "Diatom_Long_Single": 0,
-    "Diatom_Spike_Chain": 0,
-    "Diatom_Sprial_Chain": 0,
-    "Diatom_Square_Single": 0,
-    "Dinoflagellate_Circles": 0,
-    "Dinoflagellate_Horns": 0,
-    "Phaeocystis": 0,
-    "Radiolaria": 0
-}
-num_classes = len(labels_map)
-#model = None
 
-## Create parse argues ##
-parser = argparse.ArgumentParser(description = 'Select between training and categorizing')
-group = parser.add_mutually_exclusive_group()
-group.add_argument('-t', '--train', action='store_true', help='Train the model on the current training data.')
-group.add_argument('-c', '--categorize', action='store_true', help='Categorize unknown data to make new training data')
-args = parser.parse_args()
+# Counter for labeled data
+label_count = {label: 0 for label in labels_map.values()}
+
+# Number of classes in the dataset
+num_classes = len(labels_map)
 
 
 def create_image_csv():
+    """
+    Create a CSV file that records image names and their corresponding labels from the 'Training_Data' directory.
+    
+    The CSV file is saved in the 'History/CSVs' directory, organized by the current date. The filename is based on the
+    ISO date format.
+    """
     print("Saving CSV")
 
     folder_path = 'Training_Data'
@@ -83,7 +102,8 @@ def create_image_csv():
         "image": [],
         "label": []
     }
-    #loop through training_data to see all the training dirs, then loop through the training dirs to get all the images. Then save image file name and it's file label in a csv.
+
+    # Iterate through all subdirectories in 'Training_Data', adding image filenames and labels to data
     for dirs in os.listdir(folder_path):
         working_dir = os.path.join(folder_path, dirs)
         for files in os.listdir(working_dir):
@@ -91,155 +111,186 @@ def create_image_csv():
             data["label"].append(dirs)
 
     df = pd.DataFrame(data)
-    # This creates the csv name: ISO date format
-    filename = time.strftime("%Y-%m-%dT%H:%M.csv", time.gmtime())
-    directory_name=time.strftime("%Y-%m-%d", time.gmtime())
 
-    # Try to save the CSV, If you can't, error out.
+    # Save CSV with filename based on ISO date format
+    filename = time.strftime("%Y-%m-%dT%H:%M.csv", time.gmtime())
+    directory_name = time.strftime("%Y-%m-%d", time.gmtime())
+
     try:
-        path = os.path.join("History", "CSVs")
-        path = os.path.join(path, directory_name)
-        os.makedirs(path, exist_ok = True)
+        path = os.path.join("History", "CSVs", directory_name)
+        os.makedirs(path, exist_ok=True)
         df.to_csv(os.path.join(path, filename), header=False, index=False)
     except OSError as error:
         print(error)
 
-def create_cat_count_csv():
-	folder_path = 'Categorized_Data'
-	data = {
-		"data": {"image": [],
-			"label": []
-			},
-		"label_count": {"label": labels_map.values(),
-				"count": label_count.values()
-		}
-	}
-	#loop through training_data to see all the training dirs, then loop through the training dirs to get all the images. Then save image file name and it's file label in a csv.
-	for dirs in os.listdir(folder_path):
-		working_dir = os.path.join(folder_path, dirs)
-		for files in os.listdir(working_dir):
-			data["data"]["image"].append(files)
-			data["data"]["label"].append(dirs)
 
-	df = pd.DataFrame(data)
-	# This creates the csv name: ISO date format
-	filename = time.strftime("%Y-%m-%dT%H:%M.csv", time.gmtime())
-	directory_name=time.strftime("%Y-%m-%d", time.gmtime())
-	try:
-		path = os.path.join("History", "Categorize_CSVs")
-		path = os.path.join(path, directory_name)
-		os.makedirs(path, exist_ok = True)
-		#df = pd.DataFrame.from_dict(label_count, orient="index")
-		df = df.T
-		df.to_csv(os.path.join(path, filename), header=False, index=False)
-	except OSError as error:
-		print(error)
+def create_cat_count_csv():
+    """
+    Create a CSV file that records the counts of categorized images based on their predicted labels from the 
+    'Categorized_Data' directory.
     
+    The CSV file is saved in the 'History/Categorize_CSVs' directory, organized by the current date.
+    """
+    folder_path = 'Categorized_Data'
+    data = {
+        "data": {"image": [], "label": []},
+        "label_count": {"label": labels_map.values(), "count": label_count.values()}
+    }
+
+    # Iterate through all subdirectories in 'Categorized_Data', adding image filenames and labels to data
+    for dirs in os.listdir(folder_path):
+        working_dir = os.path.join(folder_path, dirs)
+        for files in os.listdir(working_dir):
+            data["data"]["image"].append(files)
+            data["data"]["label"].append(dirs)
+
+    df = pd.DataFrame(data)
+
+    # Save CSV with filename based on ISO date format
+    filename = time.strftime("%Y-%m-%dT%H:%M.csv", time.gmtime())
+    directory_name = time.strftime("%Y-%m-%d", time.gmtime())
+
+    try:
+        path = os.path.join("History", "Categorize_CSVs", directory_name)
+        os.makedirs(path, exist_ok=True)
+        df = df.T
+        df.to_csv(os.path.join(path, filename), header=False, index=False)
+    except OSError as error:
+        print(error)
+
 
 def save_model(model):
+    """
+    Save the trained model as a .pth file. The model is saved in the 'History/Models' directory, organized by the 
+    current date. The filename is based on the ISO date format.
+    
+    Args:
+        model (torch.nn.Module): The trained PyTorch model to be saved.
+    """
     torch.save(model, 'HM_model.pth')
-    # This creates the csv name: ISO date format
     filename = time.strftime("%Y-%m-%dT%H:%M_Model.pth", time.gmtime())
-    directory_name=time.strftime("%Y-%m-%d", time.gmtime())
+    directory_name = time.strftime("%Y-%m-%d", time.gmtime())
 
-    # Try to save the CSV, If you can't, error out.
     try:
-        path = os.path.join("History", "Models")
-        path = os.path.join(os.path.join(path, directory_name))
-        os.makedirs(path, exist_ok = True)
+        path = os.path.join("History", "Models", directory_name)
+        os.makedirs(path, exist_ok=True)
         torch.save(model, os.path.join(path, filename))
     except OSError as error:
         print(error)
 
 
-def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion, optimizer, num_epochs):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion, optimizer, num_epochs):
+    """
+    Train and validate the given model using the provided training and validation data loaders.
+    This function implements a standard training loop in PyTorch, along with early stopping to 
+    prevent overfitting.
+
+    Args:
+        model (torch.nn.Module): The neural network model to be trained.
+        train_loader (DataLoader): DataLoader for the training dataset.
+        val_loader (DataLoader): DataLoader for the validation dataset.
+        train_dataset (Dataset): Full training dataset.
+        val_dataset (Dataset): Full validation dataset.
+        criterion (torch.nn.Module): Loss function used to calculate the training and validation losses.
+        optimizer (torch.optim.Optimizer): Optimizer used to update the model's parameters.
+        num_epochs (int): The number of epochs for which to train the model.
+
+    Functionality:
+    - Performs a forward pass through the network for each batch of training data.
+    - Computes the loss and performs a backward pass to update the model's parameters.
+    - Evaluates the model on the validation dataset at the end of each epoch.
+    - Implements early stopping based on validation loss, to prevent overfitting.
+    - Loads the best-performing model based on validation performance after early stopping.
+
+    Training Process:
+    1. Set the model to training mode.
+    2. For each epoch, iterate over the training batches:
+       - Compute predictions, loss, and perform backpropagation.
+       - Update the model parameters.
+    3. At the end of each epoch, evaluate the model on the validation dataset:
+       - Set the model to evaluation mode.
+       - Compute predictions and loss on the validation data.
+    4. Print epoch statistics such as training loss, validation loss, and accuracy.
+    5. If early stopping is triggered, stop training and load the best-performing model.
+
+    Returns:
+        torch.nn.Module: The trained model, potentially with early stopping applied.
+    """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
-    # Create early stopping
-    early_stopping = EarlyStopping(patience = patience, verbose = True, delta = min_delta)
+    # Create early stopping object to monitor validation loss
+    early_stopping = EarlyStopping(patience=patience, verbose=True, delta=min_delta)
 
-
-    # Train the model for the specified number of epochs
+    # Training loop over epochs
     for epoch in range(num_epochs):
         # Set the model to train mode
         model.train()
 
-        # Initialize the running loss and accuracy
-        running_loss = 0.0
-        running_corrects = 0        
+        running_loss = 0.0  # Tracks loss across batches
+        running_corrects = 0  # Tracks correct predictions across batches
 
-        # Iterate over the batches of the train loader
+        # Iterate through the training data
         for inputs, labels in train_loader:
-            # Move the inputs and labels to the device
-            inputs = inputs.to(device)
-            labels = labels.to(device)
+            inputs, labels = inputs.to(device), labels.to(device)  # Move data to GPU if available
 
-            # Zero the optimizer gradients
-            optimizer.zero_grad()
+            optimizer.zero_grad()  # Reset gradients from the previous step
 
-            # Forward pass
-            outputs = model(inputs)
-            _, preds = torch.max(outputs, 1)
-            loss = criterion(outputs, labels)
+            outputs = model(inputs)  # Forward pass
+            _, preds = torch.max(outputs, 1)  # Get the predictions
+            loss = criterion(outputs, labels)  # Compute the loss
 
-            # Backward pass and optimizer step
-            loss.backward()
-            optimizer.step()
+            loss.backward()  # Backward pass (compute gradients)
+            optimizer.step()  # Update model parameters
 
-            # Update the running loss and accuracy
-            running_loss += loss.item() * inputs.size(0)
-            running_corrects += torch.sum(preds == labels.data)
+            running_loss += loss.item() * inputs.size(0)  # Accumulate loss
+            running_corrects += torch.sum(preds == labels.data)  # Accumulate correct predictions
 
-        # Calculate the train loss and accuracy
+        # Compute average training loss and accuracy for the epoch
         train_loss = running_loss / len(train_dataset)
         train_acc = running_corrects.double() / len(train_dataset)
 
-        # Set the model to evaluation mode
+        # Validation phase: set the model to evaluation mode
         model.eval()
+        running_val_loss = 0.0
+        running_val_corrects = 0
 
-        # Initialize the running loss and accuracy
-        running_loss = 0.0
-        running_corrects = 0
-
-        # Iterate oHM_model_over_night.pthver the batches of the validation loader
+        # Disable gradient calculation for validation (saves memory and computation)
         with torch.no_grad():
             for inputs, labels in val_loader:
-                # Move the inputs and labels to the device
-                inputs = inputs.to(device)
-                labels = labels.to(device)
+                inputs, labels = inputs.to(device), labels.to(device)
 
-                # Forward pass
-                outputs = model(inputs)
+                outputs = model(inputs)  # Forward pass
                 _, preds = torch.max(outputs, 1)
-                loss = criterion(outputs, labels)
+                loss = criterion(outputs, labels)  # Compute validation loss
 
-                # Update the running loss and accuracy
-                running_loss += loss.item() * inputs.size(0)
-                running_corrects += torch.sum(preds == labels.data)
+                running_val_loss += loss.item() * inputs.size(0)  # Accumulate validation loss
+                running_val_corrects += torch.sum(preds == labels.data)  # Accumulate validation accuracy
 
-                # print("The output was: " +  str(preds) + "\nAnd the label was: " + str(labels) + "\n")
+        # Compute average validation loss and accuracy
+        val_loss = running_val_loss / len(val_dataset)
+        val_acc = running_val_corrects.double() / len(val_dataset)
 
+        # Print epoch statistics
+        print(f'Epoch [{epoch+1}/{num_epochs}], train loss: {train_loss:.4f}, train acc: {train_acc:.4f}, '
+              f'val loss: {val_loss:.4f}, val acc: {val_acc:.4f}')
 
-        # Calculate the validation loss and accuracy
-        val_loss = running_loss / len(val_dataset)
-        val_acc = running_corrects.double() / len(val_dataset)
-
-        # Print the epoch results
-        print('Epoch [{}/{}], train loss: {:.4f}, train acc: {:.4f}, val loss: {:.4f}, val acc: {:.4f}'
-              .format(epoch+1, num_epochs, train_loss, train_acc, val_loss, val_acc))
-
-        
-
+        # Check if early stopping is triggered based on validation loss
         if early_stopping(val_loss, model):
-            print("\nEarly Stopping Here\n")
+            print("\nEarly stopping triggered, halting training.\n")
             break
 
-
+    # Load the best model after early stopping
     model = early_stopping.load_checkpoint(model).to(device)
+    return model
 
-        
+## Create parse argues ##
+parser = argparse.ArgumentParser(description = 'Select between training and categorizing')
+group = parser.add_mutually_exclusive_group()
+group.add_argument('-t', '--train', action='store_true', help='Train the model on the current training data.')
+group.add_argument('-c', '--categorize', action='store_true', help='Categorize unknown data to make new training data')
+args = parser.parse_args()
 
 
 #Load the resnet18 model on first run unless a pre-run model is found
@@ -263,7 +314,12 @@ transform = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) #This changes the pixel to have mean of 0 and a std of 1. We will probably need to change this for our dataset. subtract the mean and divide by the std.
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]), #This changes the pixel to have mean of 0 and a std of 1. We will probably need to change this for our dataset. subtract the mean and divide by the std.
+    transforms.RandomHorizontalFlip([0.5]),
+    transforms.RandomVerticalFlip([0.5]),
+    transforms.RandomChannelPermutation(),
+    transforms.ColorJitter(),
+    transforms.GaussianNoise()
 ])
 
 # Set the device

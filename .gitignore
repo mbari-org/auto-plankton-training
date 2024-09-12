@@ -1,5 +1,8 @@
 # Folders
 __pycache__
+/Training_Data/
+/New_Data/
+
 
 # Images
 *.png
