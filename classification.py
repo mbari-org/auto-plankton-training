@@ -277,7 +277,7 @@ def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion
               f'val loss: {val_loss:.4f}, val acc: {val_acc:.4f}')
 
         # Check if early stopping is triggered based on validation loss
-        if early_stopping(val_loss, model):
+        if early_stopping(val_acc, model):
             print("\nEarly stopping triggered, halting training.\n")
             break
 
