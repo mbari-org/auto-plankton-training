@@ -49,7 +49,7 @@ from torchvision.transforms import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from earlystopping import EarlyStopping
+from EarlyStopping import EarlyStopping
 
 #### Modifiable variables ####
 
