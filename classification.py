@@ -42,9 +42,10 @@ import pandas as pd
 from sklearn.model_selection import RepeatedKFold as K_Fold
 import torch
 import torchvision.models as models
-from torchvision import datasets, transforms
+from torchvision import datasets
 from torch.utils.data import DataLoader, Subset
 from torchvision.datasets import ImageFolder
+from torchvision.transforms import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
 

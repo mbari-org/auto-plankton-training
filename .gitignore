@@ -2,6 +2,7 @@
 __pycache__
 /Training_Data/
 /New_Data/
+.DS_Store
 
 
 # Images
