@@ -317,8 +317,7 @@ transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]), #This changes the pixel to have mean of 0 and a std of 1. We will probably need to change this for our dataset. subtract the mean and divide by the std.
     transforms.RandomHorizontalFlip(0.5),
-    transforms.RandomVerticalFlip(0.5),
-    transforms.GaussianNoise()
+    transforms.RandomVerticalFlip(0.5)
 ])
 
 # Set the device
