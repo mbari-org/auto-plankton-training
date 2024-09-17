@@ -117,7 +117,7 @@ def create_image_csv():
     """
     print("Saving CSV")
 
-    folder_path = args.path
+    folder_path = args.path_train
     data = {
         "image": [],
         "label": []
