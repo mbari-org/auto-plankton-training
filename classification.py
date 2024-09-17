@@ -160,7 +160,7 @@ def create_cat_count_csv():
         print(error)
 
 
-def save_model(model):
+def save_model(model, name):
     """
     Save the trained model as a .pth file. The model is saved in the 'History/Models' directory, organized by the 
     current date. The filename is based on the ISO date format.
@@ -168,7 +168,7 @@ def save_model(model):
     Args:
         model (torch.nn.Module): The trained PyTorch model to be saved.
     """
-    torch.save(model, 'HM_model.pth')
+    torch.save(model, '{}.pth'.format(name))
     filename = time.strftime("%Y-%m-%dT%H:%M_Model.pth", time.gmtime())
     directory_name = time.strftime("%Y-%m-%d", time.gmtime())
 
@@ -291,23 +291,23 @@ parser = argparse.ArgumentParser(description = 'Select between training and cate
 group = parser.add_mutually_exclusive_group()
 group.add_argument('-t', '--train', action='store_true', help='Train the model on the current training data.')
 group.add_argument('-c', '--categorize', action='store_true', help='Categorize unknown data to make new training data')
+group.add_argument('-n', '--name', action='store_true', help='Name of the test')
 args = parser.parse_args()
 
 
 #Load the resnet18 model on first run unless a pre-run model is found
-if (not os.path.exists('HM_model.pth') or remake_model):
+if (not os.path.exists('{}.pth'.format(args.name)) or remake_model):
     print("Previous model does not exist, loading resnet18")
     model = models.resnet18(weights='DEFAULT')#, weights='HM_weights')
     #Modify the last layer of the model
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 else:
-    print("Previous model found, loading HM_model")
-    model = models.resnet18(weights='DEFAULT')#, weights='HM_weights')
+    print("Previous model found, loading {}".format(args.name))
+    model = models.resnet18( weights=args.name)
     #Modify the last layer of the model
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
-    model.load_state_dict(torch.load('HM_model.pth'))
-    #print(model)
-
+    model.load_state_dict(torch.load('{}.pth'.format(args.name)))
+    print("Loading the model with the weights of: ", args.name)
 
 
 # Define the transformations to apply to the images
@@ -380,7 +380,7 @@ if args.train:
 
     
     create_image_csv()
-    save_model(model)
+    save_model(model, args.name)
 
 ###### Categorizing ######
 elif args.categorize:
