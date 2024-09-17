@@ -17,10 +17,10 @@ In order to train a model, match the training categories in classification.py wi
 ```shell
 python classification.py -t
 ```
-The -t flag will set the programing into training mode to create a new model if no previous model exists. It will both look and save a model called HM_model.pth. If a model does not exist, then classification.py will create it.
+The -t flag will set the programing into training mode to create a new model if no previous model exists. It will both look and save a model called {name}.pth. If a model does not exist, then classification.py will create it.
 
 ### Classification
-In order to with HM_model.pth to classify new data for bootstrapping, images must be in a file called "New_Data"
+In order to with {name}.pth to classify new data for bootstrapping, images must be in a file called "New_Data"
 ```shell
 mkdir "New_Data
 ```
