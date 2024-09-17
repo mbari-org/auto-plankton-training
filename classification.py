@@ -48,6 +48,7 @@ from torchvision.datasets import ImageFolder
 from torchvision.transforms import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 from EarlyStopping import EarlyStopping
 
@@ -413,37 +414,100 @@ if args.train:
     create_image_csv()
     save_model(model, args.name)
 
-###### Categorizing ######
-elif args.categorize:
+# Script to categorize images and save logs
+if args.categorize:
     # Load the dataset from 'New_Data' folder
     folder_path = args.path_test
 
     # Set the model to evaluate mode and disable the tensor.backward() call
     model.eval()  # Set the model to evaluation mode
     torch.no_grad()
-    # Iterate over each image in the folder
-    for img_name in os.listdir(folder_path):
-        img_path = os.path.join(folder_path, img_name)
-        image = Image.open(img_path)
-        image_tensor = transform(image).unsqueeze(0).to(device)  # Apply transformation and move to device
-        outputs = model(image_tensor)
-        _, predicted = torch.max(outputs, 1)
-        predicted_label = predicted.item()
+    
+    # Dictionary to keep track of label counts
+    label_count = defaultdict(int)
+    
+    # List to store logs
+    logs = []
 
-        ## Using the label map defined at the top for the folder names for the labels.
-        predicted_label = labels_map[predicted_label]
-        label_count[predicted_label] += 1 
-        
-        # Create folder if it doesn't exist
-        label_folder = os.path.join(args.path_test, predicted_label)
-        os.makedirs(label_folder, exist_ok=True)
-        
-        # Save the image to the corresponding folder
-        destination_path = os.path.join(label_folder, img_name)
-        os.rename(img_path, destination_path)
-        print(f'Saved {img_name} to {label_folder}')
+    # Iterate over each image in the folder recursively
+    for root, dirs, files in os.walk(folder_path):
+        for img_name in files:
+            img_path = os.path.join(root, img_name)
+            image = Image.open(img_path)
+            image_tensor = transform(image).unsqueeze(0).to(device)  # Apply transformation and move to device
+            outputs = model(image_tensor)
+            _, predicted = torch.max(outputs, 1)
+            predicted_label = predicted.item()
+
+            # Using the label map to get the label name
+            predicted_label_name = labels_map[predicted_label]
+
+            # Determine the true label from the folder name
+            true_label = os.path.basename(root)
+
+            # Update label count
+            label_count[predicted_label_name] += 1
+
+            # Create folder if it doesn't exist
+            label_folder = os.path.join(folder_path, predicted_label_name)
+            os.makedirs(label_folder, exist_ok=True)
+
+            # Save the image to the corresponding folder
+            destination_path = os.path.join(label_folder, img_name)
+            os.rename(img_path, destination_path)
+
+            # Log the image path, predicted label, and true label
+            logs.append({
+                "image_path": img_path,
+                "predicted_label": predicted_label_name,
+                "true_label": true_label
+            })
+
+            print(f'Saved {img_name} to {label_folder}')
+
+    # Print the label counts
     print(label_count)
-    create_cat_count_csv()
+
+    # Create a DataFrame from the logs and save to CSV
+    log_df = pd.DataFrame(logs)
+    log_csv_path = os.path.join("History", "Categorize_CSVs", time.strftime("%Y-%m-%d"))
+    os.makedirs(log_csv_path, exist_ok=True)
+    log_df.to_csv(os.path.join(log_csv_path, time.strftime("%Y-%m-%dT%H:%M_log.csv")), index=False)
+    
+    #create_cat_count_csv(label_count)
+
+###### Categorizing ######
+if False:
+    if args.categorize:
+        # Load the dataset from 'New_Data' folder
+        folder_path = args.path_test
+
+        # Set the model to evaluate mode and disable the tensor.backward() call
+        model.eval()  # Set the model to evaluation mode
+        torch.no_grad()
+        # Iterate over each image in the folder
+        for img_name in os.listdir(folder_path):
+            img_path = os.path.join(folder_path, img_name)
+            image = Image.open(img_path)
+            image_tensor = transform(image).unsqueeze(0).to(device)  # Apply transformation and move to device
+            outputs = model(image_tensor)
+            _, predicted = torch.max(outputs, 1)
+            predicted_label = predicted.item()
+
+            ## Using the label map defined at the top for the folder names for the labels.
+            predicted_label = labels_map[predicted_label]
+            label_count[predicted_label] += 1 
+            
+            # Create folder if it doesn't exist
+            label_folder = os.path.join(args.path_test, predicted_label)
+            os.makedirs(label_folder, exist_ok=True)
+            
+            # Save the image to the corresponding folder
+            destination_path = os.path.join(label_folder, img_name)
+            os.rename(img_path, destination_path)
+            print(f'Saved {img_name} to {label_folder}')
+        print(label_count)
+        create_cat_count_csv()
 
 else:
 	print(labels_map.values())
