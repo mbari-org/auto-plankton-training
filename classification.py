@@ -62,25 +62,43 @@ num_of_repeats = 1  # Number of times K-fold cross-validation is repeated
 remake_model = False  # Set to True if a new model is to be trained every time
 patience = 10  # Early stopping patience (number of epochs without improvement)
 min_delta = 0.0  # Minimum delta for improvement to reset early stopping counter
+plaktivore = False
 
 # Label mapping (class labels)
-labels_map = {
-    0: "Aggregate",
-    1: "Bad_Mask",
-    2: "Blurry",
-    3: "Camera_Ring",
-    4: "Ciliate",
-    5: "Copepod",
-    6: "Diatom_Long_Chain",
-    7: "Diatom_Long_Single",
-    8: "Diatom_Spike_Chain",
-    9: "Diatom_Sprial_Chain",
-    10: "Diatom_Square_Single",
-    11: "Dinoflagellate_Circles",
-    12: "Dinoflagellate_Horns",
-    13: "Phaeocystis",
-    14: "Radiolaria"
-}
+if plaktivore:
+    labels_map = {
+        0: "Aggregate",
+        1: "Bad_Mask",
+        2: "Blurry",
+        3: "Camera_Ring",
+        4: "Ciliate",
+        5: "Copepod",
+        6: "Diatom_Long_Chain",
+        7: "Diatom_Long_Single",
+        8: "Diatom_Spike_Chain",
+        9: "Diatom_Sprial_Chain",
+        10: "Diatom_Square_Single",
+        11: "Dinoflagellate_Circles",
+        12: "Dinoflagellate_Horns",
+        13: "Phaeocystis",
+        14: "Radiolaria"
+    }
+else:
+        labels_map = {
+        0: "aggregate",
+        1: "artifact",
+        2: "centric_diatom",
+        3: "copepod",
+        4: "diatom_chain",
+        5: "fecal_pellet",
+        6: "football",
+        7: "gelatinous",
+        8: "larvacean",
+        9: "long_particle_blur",
+        10: "particle_blur",
+        11: "phaeocystis",
+        12: "rhizaria"
+    }
 
 # Counter for labeled data
 label_count = {label: 0 for label in labels_map.values()}
@@ -91,20 +109,20 @@ num_classes = len(labels_map)
 
 def create_image_csv():
     """
-    Create a CSV file that records image names and their corresponding labels from the 'Training_Data' directory.
+    Create a CSV file that records image names and their corresponding labels from the args.path directory.
     
     The CSV file is saved in the 'History/CSVs' directory, organized by the current date. The filename is based on the
     ISO date format.
     """
     print("Saving CSV")
 
-    folder_path = 'Training_Data'
+    folder_path = args.path
     data = {
         "image": [],
         "label": []
     }
 
-    # Iterate through all subdirectories in 'Training_Data', adding image filenames and labels to data
+    # Iterate through all subdirectories in args.path, adding image filenames and labels to data
     for dirs in os.listdir(folder_path):
         working_dir = os.path.join(folder_path, dirs)
         for files in os.listdir(working_dir):
@@ -290,6 +308,7 @@ def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion
 parser = argparse.ArgumentParser(description = 'Select between training and categorizing')
 group = parser.add_mutually_exclusive_group()
 group.add_argument('-t', '--train', action='store_true', help='Train the model on the current training data.')
+group.add_argument('-path', '--path-train', action='store_true', help='Path to the folder with the classes to train')
 group.add_argument('-c', '--categorize', action='store_true', help='Categorize unknown data to make new training data')
 group.add_argument('-n', '--name', action='store_true', help='Name of the test')
 args = parser.parse_args()
@@ -339,7 +358,7 @@ if args.train:
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 
     #Load the dataset
-    dataset = ImageFolder(root = 'Training_Data', transform=transform)
+    dataset = ImageFolder(root = args.path, transform=transform)
 
     # Define the loss function and optimizer
     criterion = torch.nn.CrossEntropyLoss()
