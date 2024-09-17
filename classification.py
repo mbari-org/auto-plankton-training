@@ -305,13 +305,25 @@ def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion
     return model
 
 ## Create parse argues ##
-parser = argparse.ArgumentParser(description = 'Select between training and categorizing')
-group = parser.add_mutually_exclusive_group()
-group.add_argument('-t', '--train', action='store_true', help='Train the model on the current training data.')
-group.add_argument('-path', '--path-train', action='store_true', help='Path to the folder with the classes to train')
-group.add_argument('-c', '--categorize', action='store_true', help='Categorize unknown data to make new training data')
-group.add_argument('-n', '--name', action='store_true', help='Name of the test')
+parser = argparse.ArgumentParser(description='Select between training and categorizing')
+parser.add_argument('-t', '--train', action='store_true', help='Train the model on the current training data.')
+parser.add_argument('-pathtrain', '--path-train', type=str, help='Path to the folder with the classes to train')
+parser.add_argument('-c', '--categorize', action='store_true', help='Categorize unknown data to make new training data')
+parser.add_argument('-pathtest', '--path-test', type=str, help='Path to the folder with the classes to train')
+parser.add_argument('-n', '--name', type=str, help='Name of the test')
+
 args = parser.parse_args()
+
+# Custom validation logic
+if args.train:
+    if not args.path_train or not args.name:
+        parser.error("--train requires --path-train and --name to be specified.")
+    # You can add additional logic here for training with the given path and name
+
+if args.categorize:
+    if not args.path_test:
+        parser.error("--categorize requires --path-test.")
+
 
 
 #Load the resnet18 model on first run unless a pre-run model is found
@@ -358,7 +370,7 @@ if args.train:
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 
     #Load the dataset
-    dataset = ImageFolder(root = args.path, transform=transform)
+    dataset = ImageFolder(root = args.path_train, transform=transform)
 
     # Define the loss function and optimizer
     criterion = torch.nn.CrossEntropyLoss()
@@ -404,7 +416,7 @@ if args.train:
 ###### Categorizing ######
 elif args.categorize:
     # Load the dataset from 'New_Data' folder
-    folder_path = 'New_Data'
+    folder_path = args.path_test
 
     # Set the model to evaluate mode and disable the tensor.backward() call
     model.eval()  # Set the model to evaluation mode
@@ -423,7 +435,7 @@ elif args.categorize:
         label_count[predicted_label] += 1 
         
         # Create folder if it doesn't exist
-        label_folder = os.path.join('Categorized_Data', predicted_label)
+        label_folder = os.path.join(args.path_test, predicted_label)
         os.makedirs(label_folder, exist_ok=True)
         
         # Save the image to the corresponding folder
