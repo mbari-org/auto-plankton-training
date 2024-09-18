@@ -436,14 +436,14 @@ if args.categorize:
                 })
 
                 print(f'Saved {img_name} to {label_folder}')
-                
+
     # Create a DataFrame from the logs and save to CSV
     log_df = pd.DataFrame(logs)
     log_csv_path = os.path.join("History", "Categorize_CSVs", time.strftime("%Y-%m-%d"), args.name)
     os.makedirs(log_csv_path, exist_ok=True)
 
     # Save the log CSV file
-    csv_file_path = os.path.join(log_csv_path, args.name)
+    csv_file_path = os.path.join(log_csv_path, "images_csv")
     log_df.to_csv(csv_file_path, index=False)
 
     # Load the CSV that your code produced
