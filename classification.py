@@ -439,7 +439,7 @@ if args.categorize:
                 
     # Create a DataFrame from the logs and save to CSV
     log_df = pd.DataFrame(logs)
-    log_csv_path = os.path.join("History", "Categorize_CSVs", time.strftime("%Y-%m-%d"))
+    log_csv_path = os.path.join("History", "Categorize_CSVs", time.strftime("%Y-%m-%d"), args.name)
     os.makedirs(log_csv_path, exist_ok=True)
 
     # Save the log CSV file
