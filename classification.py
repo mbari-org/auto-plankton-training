@@ -436,18 +436,18 @@ if args.categorize:
                 })
 
                 print(f'Saved {img_name} to {label_folder}')
-
-    # Print the label counts
-    print("Predictions: ", label_count)
-
+                
     # Create a DataFrame from the logs and save to CSV
     log_df = pd.DataFrame(logs)
     log_csv_path = os.path.join("History", "Categorize_CSVs", time.strftime("%Y-%m-%d"))
     os.makedirs(log_csv_path, exist_ok=True)
-    log_df.to_csv(os.path.join(log_csv_path, args.name), index=False)
+
+    # Save the log CSV file
+    csv_file_path = os.path.join(log_csv_path, args.name)
+    log_df.to_csv(csv_file_path, index=False)
 
     # Load the CSV that your code produced
-    df = pd.read_csv(os.path.join(log_csv_path, args.name))
+    df = pd.read_csv(csv_file_path)
 
     # Extract true labels and predicted labels from the DataFrame
     true_labels = df['true_label']
@@ -465,8 +465,9 @@ if args.categorize:
     print(f'F1 Score: {f1}')
     print(f'Precision: {precision}')
 
-    # Write the metrics to the text file
-    with open(os.path.join(log_csv_path, args.name,'metrics_report.txt'), 'w') as f:
+    # Write the metrics to the text file (saving in the same directory as the CSV)
+    metrics_file_path = os.path.join(log_csv_path, 'metrics_report.txt')
+    with open(metrics_file_path, 'w') as f:
         f.write(f'Accuracy: {accuracy}\n')
         f.write(f'F1 Score: {f1}\n')
         f.write(f'Precision: {precision}\n')
@@ -478,8 +479,9 @@ if args.categorize:
     plt.ylabel('True Label')
     plt.title('Confusion Matrix')
 
-    # Saving the image
-    plt.savefig(os.path.join(log_csv_path, args.name,'confusion_matrix.png'))
+    # Save the confusion matrix as an image (use a separate filename, not args.name)
+    confusion_matrix_path = os.path.join(log_csv_path, 'confusion_matrix.png')
+    plt.savefig(confusion_matrix_path)
     plt.close()
 
     # Count the frequencies of true and predicted labels
@@ -500,8 +502,9 @@ if args.categorize:
     plt.ylabel('Frequency')
     plt.title('Frequency of True vs Predicted Labels')
 
-    # Save the chart as an image
-    plt.savefig(os.path.join(log_csv_path, args.name,'label_frequencies.png'))
+    # Save the frequency chart as an image (use a separate filename, not args.name)
+    frequency_chart_path = os.path.join(log_csv_path, 'label_frequencies.png')
+    plt.savefig(frequency_chart_path)
 
     # Close the figure to free memory
     plt.close()
