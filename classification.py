@@ -339,7 +339,7 @@ else:
     model = models.resnet18(weights='DEFAULT')
     #Modify the last layer of the model
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
-    model.load_state_dict(torch.load('{}.pth'.format(args.name)))
+    model = torch.load('{}.pth'.format(args.name))
     print("Loading the model with the weights of: ", args.name)
 
 
