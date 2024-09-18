@@ -40,6 +40,7 @@ import time
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import RepeatedKFold as K_Fold
+from sklearn.metrics import confusion_matrix, accuracy_score, f1_score, precision_score
 import torch
 import torchvision.models as models
 from torchvision import datasets
@@ -49,6 +50,8 @@ from torchvision.transforms import transforms
 from PIL import Image
 import matplotlib.pyplot as plt
 from collections import defaultdict
+import seaborn as sns
+
 
 from EarlyStopping import EarlyStopping
 
@@ -63,10 +66,10 @@ num_of_repeats = 1  # Number of times K-fold cross-validation is repeated
 remake_model = False  # Set to True if a new model is to be trained every time
 patience = 10  # Early stopping patience (number of epochs without improvement)
 min_delta = 0.0  # Minimum delta for improvement to reset early stopping counter
-plaktivore = False
+planktivore = False
 
 # Label mapping (class labels)
-if plaktivore:
+if planktivore:
     labels_map = {
         0: "Aggregate",
         1: "Bad_Mask",
@@ -142,42 +145,6 @@ def create_image_csv():
         df.to_csv(os.path.join(path, filename), header=False, index=False)
     except OSError as error:
         print(error)
-
-
-def create_cat_count_csv():
-    """
-    Create a CSV file that records the counts of categorized images based on their predicted labels from the 
-    'Categorized_Data' directory.
-    
-    The CSV file is saved in the 'History/Categorize_CSVs' directory, organized by the current date.
-    """
-    folder_path = 'Categorized_Data'
-    data = {
-        "data": {"image": [], "label": []},
-        "label_count": {"label": labels_map.values(), "count": label_count.values()}
-    }
-
-    # Iterate through all subdirectories in 'Categorized_Data', adding image filenames and labels to data
-    for dirs in os.listdir(folder_path):
-        working_dir = os.path.join(folder_path, dirs)
-        for files in os.listdir(working_dir):
-            data["data"]["image"].append(files)
-            data["data"]["label"].append(dirs)
-
-    df = pd.DataFrame(data)
-
-    # Save CSV with filename based on ISO date format
-    filename = time.strftime("%Y-%m-%dT%H:%M.csv", time.gmtime())
-    directory_name = time.strftime("%Y-%m-%d", time.gmtime())
-
-    try:
-        path = os.path.join("History", "Categorize_CSVs", directory_name)
-        os.makedirs(path, exist_ok=True)
-        df = df.T
-        df.to_csv(os.path.join(path, filename), header=False, index=False)
-    except OSError as error:
-        print(error)
-
 
 def save_model(model, name):
     """
@@ -313,6 +280,7 @@ parser.add_argument('-pathtrain', '--path-train', type=str, help='Path to the fo
 parser.add_argument('-c', '--categorize', action='store_true', help='Categorize unknown data to make new training data')
 parser.add_argument('-pathtest', '--path-test', type=str, help='Path to the folder with the classes to train')
 parser.add_argument('-n', '--name', type=str, help='Name of the test')
+parser.add_argument('-v', '--verbose', type=bool, help='DEbugging')
 
 args = parser.parse_args()
 
@@ -323,8 +291,8 @@ if args.train:
     # You can add additional logic here for training with the given path and name
 
 if args.categorize:
-    if not args.path_test:
-        parser.error("--categorize requires --path-test.")
+    if not args.path_test or not args.name:
+        parser.error("--categorize requires --path-test  and --name to be specified.")
 
 
 
@@ -362,7 +330,7 @@ model.to(device)
 if args.train:
 
     #set up cross-validation
-    kf = K_Fold(n_splits = num_of_splits, n_repeats = num_of_repeats) #n_repeats = 5,
+    kf = K_Fold(n_splits = num_of_splits, n_repeats = num_of_repeats) 
 
     #Freeze all the pre-trained layers
     for param in model.parameters():
@@ -470,49 +438,37 @@ if args.categorize:
                 print(f'Saved {img_name} to {label_folder}')
 
     # Print the label counts
-    print(label_count)
+    print("Predictions: ", label_count)
 
     # Create a DataFrame from the logs and save to CSV
     log_df = pd.DataFrame(logs)
     log_csv_path = os.path.join("History", "Categorize_CSVs", time.strftime("%Y-%m-%d"))
     os.makedirs(log_csv_path, exist_ok=True)
-    log_df.to_csv(os.path.join(log_csv_path, time.strftime("%Y-%m-%dT%H:%M_log.csv")), index=False)
-    
-    #create_cat_count_csv(label_count)
+    log_df.to_csv(os.path.join(log_csv_path, args.name), index=False)
 
-###### Categorizing ######
-if False:
-    if args.categorize:
-        # Load the dataset from 'New_Data' folder
-        folder_path = args.path_test
+    # Load the CSV that your code produced
+    df = pd.read_csv(os.path.join(log_csv_path, args.name))
 
-        # Set the model to evaluate mode and disable the tensor.backward() call
-        model.eval()  # Set the model to evaluation mode
-        torch.no_grad()
-        # Iterate over each image in the folder
-        for img_name in os.listdir(folder_path):
-            img_path = os.path.join(folder_path, img_name)
-            image = Image.open(img_path)
-            image_tensor = transform(image).unsqueeze(0).to(device)  # Apply transformation and move to device
-            outputs = model(image_tensor)
-            _, predicted = torch.max(outputs, 1)
-            predicted_label = predicted.item()
+    # Extract true labels and predicted labels from the DataFrame
+    true_labels = df['true_label']
+    predicted_labels = df['predicted_label']
 
-            ## Using the label map defined at the top for the folder names for the labels.
-            predicted_label = labels_map[predicted_label]
-            label_count[predicted_label] += 1 
-            
-            # Create folder if it doesn't exist
-            label_folder = os.path.join(args.path_test, predicted_label)
-            os.makedirs(label_folder, exist_ok=True)
-            
-            # Save the image to the corresponding folder
-            destination_path = os.path.join(label_folder, img_name)
-            os.rename(img_path, destination_path)
-            print(f'Saved {img_name} to {label_folder}')
-        print(label_count)
-        create_cat_count_csv()
+    # Calculate the confusion matrix
+    cm = confusion_matrix(true_labels, predicted_labels, labels=list(set(true_labels)))
 
-else:
-	print(labels_map.values())
-	print("error: select train or caregorize.")
+    # Calculate accuracy, F1-score, and precision
+    accuracy = accuracy_score(true_labels, predicted_labels)
+    f1 = f1_score(true_labels, predicted_labels, average='weighted')  # Use 'weighted' if labels are imbalanced
+    precision = precision_score(true_labels, predicted_labels, average='weighted')
+
+    print(f'Accuracy: {accuracy}')
+    print(f'F1 Score: {f1}')
+    print(f'Precision: {precision}')
+
+    # Plot the confusion matrix using seaborn
+    plt.figure(figsize=(10, 7))
+    sns.heatmap(cm, annot=True, fmt='g', cmap='Blues', xticklabels=set(true_labels), yticklabels=set(true_labels))
+    plt.xlabel('Predicted Label')
+    plt.ylabel('True Label')
+    plt.title('Confusion Matrix')
+    plt.show()
