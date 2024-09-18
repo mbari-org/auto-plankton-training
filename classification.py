@@ -465,10 +465,43 @@ if args.categorize:
     print(f'F1 Score: {f1}')
     print(f'Precision: {precision}')
 
+    # Write the metrics to the text file
+    with open(os.path.join(log_csv_path, args.name,'metrics_report.txt'), 'w') as f:
+        f.write(f'Accuracy: {accuracy}\n')
+        f.write(f'F1 Score: {f1}\n')
+        f.write(f'Precision: {precision}\n')
+
     # Plot the confusion matrix using seaborn
     plt.figure(figsize=(10, 7))
     sns.heatmap(cm, annot=True, fmt='g', cmap='Blues', xticklabels=set(true_labels), yticklabels=set(true_labels))
     plt.xlabel('Predicted Label')
     plt.ylabel('True Label')
     plt.title('Confusion Matrix')
-    plt.show()
+
+    # Saving the image
+    plt.savefig(os.path.join(log_csv_path, args.name,'confusion_matrix.png'))
+    plt.close()
+
+    # Count the frequencies of true and predicted labels
+    true_label_counts = df['true_label'].value_counts()
+    predicted_label_counts = df['predicted_label'].value_counts()
+
+    # Create a DataFrame combining the frequencies of true and predicted labels
+    freq_df = pd.DataFrame({
+        'True Labels': true_label_counts,
+        'Predicted Labels': predicted_label_counts
+    }).fillna(0)  # Fill NaN with 0 if some labels are not predicted
+
+    # Create the frequency bar chart
+    ax = freq_df.plot(kind='bar', figsize=(10, 7), color=['blue', 'orange'])
+
+    # Add labels and title
+    plt.xlabel('Labels')
+    plt.ylabel('Frequency')
+    plt.title('Frequency of True vs Predicted Labels')
+
+    # Save the chart as an image
+    plt.savefig(os.path.join(log_csv_path, args.name,'label_frequencies.png'))
+
+    # Close the figure to free memory
+    plt.close()
