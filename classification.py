@@ -429,42 +429,45 @@ if args.categorize:
     
     # List to store logs
     logs = []
+    image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
 
     # Iterate over each image in the folder recursively
     for root, dirs, files in os.walk(folder_path):
         for img_name in files:
-            img_path = os.path.join(root, img_name)
-            image = Image.open(img_path)
-            image_tensor = transform(image).unsqueeze(0).to(device)  # Apply transformation and move to device
-            outputs = model(image_tensor)
-            _, predicted = torch.max(outputs, 1)
-            predicted_label = predicted.item()
+            _, ext = os.path.splitext(img_name)
+            if ext.lower() in image_extensions:
+                img_path = os.path.join(root, img_name)
+                image = Image.open(img_path)
+                image_tensor = transform(image).unsqueeze(0).to(device)  # Apply transformation and move to device
+                outputs = model(image_tensor)
+                _, predicted = torch.max(outputs, 1)
+                predicted_label = predicted.item()
 
-            # Using the label map to get the label name
-            predicted_label_name = labels_map[predicted_label]
+                # Using the label map to get the label name
+                predicted_label_name = labels_map[predicted_label]
 
-            # Determine the true label from the folder name
-            true_label = os.path.basename(root)
+                # Determine the true label from the folder name
+                true_label = os.path.basename(root)
 
-            # Update label count
-            label_count[predicted_label_name] += 1
+                # Update label count
+                label_count[predicted_label_name] += 1
 
-            # Create folder if it doesn't exist
-            label_folder = os.path.join(folder_path, predicted_label_name)
-            os.makedirs(label_folder, exist_ok=True)
+                # Create folder if it doesn't exist
+                label_folder = os.path.join(folder_path, predicted_label_name)
+                os.makedirs(label_folder, exist_ok=True)
 
-            # Save the image to the corresponding folder
-            destination_path = os.path.join(label_folder, img_name)
-            os.rename(img_path, destination_path)
+                # Save the image to the corresponding folder
+                destination_path = os.path.join(label_folder, img_name)
+                os.rename(img_path, destination_path)
 
-            # Log the image path, predicted label, and true label
-            logs.append({
-                "image_path": img_path,
-                "predicted_label": predicted_label_name,
-                "true_label": true_label
-            })
+                # Log the image path, predicted label, and true label
+                logs.append({
+                    "image_path": img_path,
+                    "predicted_label": predicted_label_name,
+                    "true_label": true_label
+                })
 
-            print(f'Saved {img_name} to {label_folder}')
+                print(f'Saved {img_name} to {label_folder}')
 
     # Print the label counts
     print(label_count)
