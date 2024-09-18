@@ -336,7 +336,7 @@ if (not os.path.exists('{}.pth'.format(args.name)) or remake_model):
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 else:
     print("Previous model found, loading {}".format(args.name))
-    model = models.resnet18(weights="2024-09-17T23:57_Model")
+    model = models.resnet18(weights='DEFAULT')
     #Modify the last layer of the model
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
     model.load_state_dict(torch.load('{}.pth'.format(args.name)))
