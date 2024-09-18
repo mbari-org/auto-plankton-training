@@ -188,7 +188,8 @@ def save_model(model, name):
         model (torch.nn.Module): The trained PyTorch model to be saved.
     """
     torch.save(model, '{}.pth'.format(name))
-    filename = time.strftime("%Y-%m-%dT%H:%M_Model.pth", time.gmtime())
+    #filename = time.strftime("%Y-%m-%dT%H:%M_Model.pth", time.gmtime())
+    filename = '{}.pth'.format(name)
     directory_name = time.strftime("%Y-%m-%d", time.gmtime())
 
     try:
@@ -335,7 +336,7 @@ if (not os.path.exists('{}.pth'.format(args.name)) or remake_model):
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 else:
     print("Previous model found, loading {}".format(args.name))
-    model = models.resnet18( weights="{}.pth".format(args.name))
+    model = models.resnet18(weights="2024-09-17T23:57_Model.pth")
     #Modify the last layer of the model
     model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
     model.load_state_dict(torch.load('{}.pth'.format(args.name)))
