@@ -59,12 +59,12 @@ from EarlyStopping import EarlyStopping
 
 # Training parameters
 batch_size = 64  # Batch size for DataLoader
-num_epochs = 1000  # Maximum number of epochs to train
+num_epochs = 100  # Maximum number of epochs to train
 learning_rate = 0.01  # Learning rate for optimizer
 num_of_splits = 5  # Number of splits in K-fold cross-validation
 num_of_repeats = 1  # Number of times K-fold cross-validation is repeated
 remake_model = False  # Set to True if a new model is to be trained every time
-patience = 10  # Early stopping patience (number of epochs without improvement)
+patience = 30  # Early stopping patience (number of epochs without improvement)
 min_delta = 0.0  # Minimum delta for improvement to reset early stopping counter
 planktivore = False
 
@@ -98,12 +98,10 @@ else:
         6: "football",
         7: "gelatinous",
         8: "larvacean",
-        9: "long_particle_blur",
-        10: "particle_blur",
-        11: "phaeocystis",
-        12: "rhizaria"
+        9: "rhizaria",
+        10: "phaeocystis"
     }
-
+        
 # Counter for labeled data
 label_count = {label: 0 for label in labels_map.values()}
 
@@ -471,6 +469,16 @@ if args.categorize:
         f.write(f'Accuracy: {accuracy}\n')
         f.write(f'F1 Score: {f1}\n')
         f.write(f'Precision: {precision}\n')
+        f.write(f'batch_size: {batch_size}\n')
+        f.write(f'num_epochs: {num_epochs}\n')
+        f.write(f'learning_rate: {learning_rate}\n')
+        f.write(f'num_of_splits: {num_of_splits}\n')
+        f.write(f'batch_size: {batch_size}\n')
+        f.write(f'num_of_repeats: {num_of_repeats}\n')
+        f.write(f'remake_model: {remake_model}\n')
+        f.write(f'patience: {patience}\n')
+        f.write(f'min_delta: {min_delta}\n')
+        f.write(f'planktivore: {planktivore}\n')
 
     # Plot the confusion matrix using seaborn
     plt.figure(figsize=(10, 7))
