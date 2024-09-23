@@ -99,7 +99,9 @@ else:
         7: "gelatinous",
         8: "larvacean",
         9: "rhizaria",
-        10: "phaeocystis"
+        10: "phaeocystis",
+        11: "long_particle_blur",
+        12: "particle_blur"
     }
         
 # Counter for labeled data
