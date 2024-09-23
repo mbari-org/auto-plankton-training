@@ -67,6 +67,7 @@ remake_model = False  # Set to True if a new model is to be trained every time
 patience = 30  # Early stopping patience (number of epochs without improvement)
 min_delta = 0.0  # Minimum delta for improvement to reset early stopping counter
 planktivore = False
+issis = False
 
 # Label mapping (class labels)
 if planktivore:
@@ -87,7 +88,7 @@ if planktivore:
         13: "Phaeocystis",
         14: "Radiolaria"
     }
-else:
+if issis:
         labels_map = {
         0: "aggregate",
         1: "artifact",
@@ -103,6 +104,24 @@ else:
         11: "long_particle_blur",
         12: "particle_blur"
     }
+else:
+        labels_map = {
+        0: "aggregate",
+        1: "fiber_blur",
+        2: "long_pellet",
+        3: "noise",
+        4: "phyto_dino",
+        5: "phyto_round",
+        6: "salp_pellet",
+        7: "swimmer",
+        8: "bubble",
+        9: "fiber_sharp",
+        10: "mini_pellet",
+        11: "none",
+        12: "phyto_long",
+        13: "rhizaria",
+        14: "short_pellet"
+    } 
         
 # Counter for labeled data
 label_count = {label: 0 for label in labels_map.values()}
