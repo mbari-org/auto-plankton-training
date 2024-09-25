@@ -402,6 +402,15 @@ if args.train:
 
 # Script to categorize images and save logs
 if args.categorize:
+
+    # Define the transformations to apply to the images
+    transform = transforms.Compose([ 
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) #This changes the pixel to have mean of 0 and a std of 1. We will probably need to change this for our dataset. subtract the mean and divide by the std.
+
+    ])
     # Load the dataset from 'New_Data' folder
     folder_path = args.path_test
 
@@ -441,14 +450,6 @@ if args.categorize:
                 # Update label count
                 label_count[predicted_label_name] += 1
 
-                # Create folder if it doesn't exist
-                label_folder = os.path.join(folder_path, predicted_label_name)
-                os.makedirs(label_folder, exist_ok=True)
-
-                # Save the image to the corresponding folder
-                destination_path = os.path.join(label_folder, img_name)
-                os.rename(img_path, destination_path)
-
                 if has_true_labels:
                     # Log the image path, predicted label, and true label
                     logs.append({
@@ -457,14 +458,25 @@ if args.categorize:
                         "true_label": true_label
                     })
                 else:
+
+                    # Create folder if it doesn't exist
+                    label_folder = os.path.join(folder_path, predicted_label_name)
+                    os.makedirs(label_folder, exist_ok=True)
+
+                    # Save the image to the corresponding folder
+                    destination_path = os.path.join(label_folder, img_name)
+                    os.rename(img_path, destination_path)
+
                     # Log the image path, predicted label, and true label
                     logs.append({
                         "image_path": img_path,
                         "predicted_label": predicted_label_name
                     })
 
+                    print(f'Saved {img_name} to {label_folder}')
 
-                print(f'Saved {img_name} to {label_folder}')
+
+                
 
     # Create a DataFrame from the logs and save to CSV
     log_df = pd.DataFrame(logs)
