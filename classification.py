@@ -58,13 +58,13 @@ from EarlyStopping import EarlyStopping
 #### Modifiable variables ####
 
 # Training parameters
-batch_size = 64  # Batch size for DataLoader
+batch_size = 4096  # Batch size for DataLoader
 num_epochs = 100  # Maximum number of epochs to train
 learning_rate = 0.01  # Learning rate for optimizer
 num_of_splits = 5  # Number of splits in K-fold cross-validation
 num_of_repeats = 1  # Number of times K-fold cross-validation is repeated
 remake_model = False  # Set to True if a new model is to be trained every time
-patience = 30  # Early stopping patience (number of epochs without improvement)
+patience = 10  # Early stopping patience (number of epochs without improvement)
 min_delta = 0.0  # Minimum delta for improvement to reset early stopping counter
 planktivore = False
 issis = False
@@ -107,20 +107,14 @@ if issis:
 else:
         labels_map = {
         0: "aggregate",
-        1: "fiber_blur",
-        2: "long_pellet",
-        3: "noise",
-        4: "phyto_dino",
-        5: "phyto_round",
-        6: "salp_pellet",
-        7: "swimmer",
-        8: "bubble",
-        9: "fiber_sharp",
-        10: "mini_pellet",
-        11: "none",
-        12: "phyto_long",
-        13: "rhizaria",
-        14: "short_pellet"
+        1: "long_pellet",
+        2: "phyto_dino",
+        3: "phyto_round",
+        4: "salp_pellet",
+        5: "mini_pellet",
+        6: "phyto_long",
+        7: "rhizaria",
+        8: "short_pellet"
     } 
         
 # Counter for labeled data
@@ -363,7 +357,11 @@ if args.train:
 
     # Define the loss function and optimizer
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.fc.parameters(), lr=learning_rate, momentum=0.9)
+
+    if planktivore == False and issis == False:
+        optimizer = torch.optim.Adam(model.fc.parameters(), lr=learning_rate)
+    else:
+        optimizer = torch.optim.SGD(model.fc.parameters(), lr=learning_rate, momentum=0.9)
 
 
     #Cross_Validation
