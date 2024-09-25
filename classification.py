@@ -114,7 +114,12 @@ else:
         5: "mini_pellet",
         6: "phyto_long",
         7: "rhizaria",
-        8: "short_pellet"
+        8: "short_pellet",
+        9: "bubble",
+        10: "fiber_blur",
+        11: "fiber_sharp",
+        12: "noise",
+        13: "swimmer" 
     } 
         
 # Counter for labeled data
