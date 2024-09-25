@@ -416,6 +416,9 @@ if args.categorize:
     logs = []
     image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
 
+    has_true_labels = any(os.path.isdir(os.path.join(folder_path, d)) for d in os.listdir(folder_path))
+
+
     # Iterate over each image in the folder recursively
     for root, dirs, files in os.walk(folder_path):
         for img_name in files:
@@ -431,8 +434,9 @@ if args.categorize:
                 # Using the label map to get the label name
                 predicted_label_name = labels_map[predicted_label]
 
+                if has_true_labels:
                 # Determine the true label from the folder name
-                true_label = os.path.basename(root)
+                    true_label = os.path.basename(root)
 
                 # Update label count
                 label_count[predicted_label_name] += 1
@@ -445,12 +449,20 @@ if args.categorize:
                 destination_path = os.path.join(label_folder, img_name)
                 os.rename(img_path, destination_path)
 
-                # Log the image path, predicted label, and true label
-                logs.append({
-                    "image_path": img_path,
-                    "predicted_label": predicted_label_name,
-                    "true_label": true_label
-                })
+                if has_true_labels:
+                    # Log the image path, predicted label, and true label
+                    logs.append({
+                        "image_path": img_path,
+                        "predicted_label": predicted_label_name,
+                        "true_label": true_label
+                    })
+                else:
+                    # Log the image path, predicted label, and true label
+                    logs.append({
+                        "image_path": img_path,
+                        "predicted_label": predicted_label_name
+                    })
+
 
                 print(f'Saved {img_name} to {label_folder}')
 
@@ -466,72 +478,97 @@ if args.categorize:
     # Load the CSV that your code produced
     df = pd.read_csv(csv_file_path)
 
-    # Extract true labels and predicted labels from the DataFrame
-    true_labels = df['true_label']
-    predicted_labels = df['predicted_label']
+    if has_true_labels:
+        # Extract true labels and predicted labels from the DataFrame
+        true_labels = df['true_label']
+        predicted_labels = df['predicted_label']
 
-    # Calculate the confusion matrix
-    cm = confusion_matrix(true_labels, predicted_labels, labels=list(set(true_labels)))
+        # Calculate the confusion matrix
+        cm = confusion_matrix(true_labels, predicted_labels, labels=list(set(true_labels)))
 
-    # Calculate accuracy, F1-score, and precision
-    accuracy = accuracy_score(true_labels, predicted_labels)
-    f1 = f1_score(true_labels, predicted_labels, average='weighted')  # Use 'weighted' if labels are imbalanced
-    precision = precision_score(true_labels, predicted_labels, average='weighted')
+        # Calculate accuracy, F1-score, and precision
+        accuracy = accuracy_score(true_labels, predicted_labels)
+        f1 = f1_score(true_labels, predicted_labels, average='weighted')  # Use 'weighted' if labels are imbalanced
+        precision = precision_score(true_labels, predicted_labels, average='weighted')
 
-    print(f'Accuracy: {accuracy}')
-    print(f'F1 Score: {f1}')
-    print(f'Precision: {precision}')
+        print(f'Accuracy: {accuracy}')
+        print(f'F1 Score: {f1}')
+        print(f'Precision: {precision}')
 
-    # Write the metrics to the text file (saving in the same directory as the CSV)
-    metrics_file_path = os.path.join(log_csv_path, 'metrics_report.txt')
-    with open(metrics_file_path, 'w') as f:
-        f.write(f'Accuracy: {accuracy}\n')
-        f.write(f'F1 Score: {f1}\n')
-        f.write(f'Precision: {precision}\n')
-        f.write(f'batch_size: {batch_size}\n')
-        f.write(f'num_epochs: {num_epochs}\n')
-        f.write(f'learning_rate: {learning_rate}\n')
-        f.write(f'num_of_splits: {num_of_splits}\n')
-        f.write(f'batch_size: {batch_size}\n')
-        f.write(f'num_of_repeats: {num_of_repeats}\n')
-        f.write(f'remake_model: {remake_model}\n')
-        f.write(f'patience: {patience}\n')
-        f.write(f'min_delta: {min_delta}\n')
-        f.write(f'planktivore: {planktivore}\n')
+        # Write the metrics to the text file (saving in the same directory as the CSV)
+        metrics_file_path = os.path.join(log_csv_path, 'metrics_report.txt')
+        with open(metrics_file_path, 'w') as f:
+            f.write(f'Accuracy: {accuracy}\n')
+            f.write(f'F1 Score: {f1}\n')
+            f.write(f'Precision: {precision}\n')
+            f.write(f'batch_size: {batch_size}\n')
+            f.write(f'num_epochs: {num_epochs}\n')
+            f.write(f'learning_rate: {learning_rate}\n')
+            f.write(f'num_of_splits: {num_of_splits}\n')
+            f.write(f'batch_size: {batch_size}\n')
+            f.write(f'num_of_repeats: {num_of_repeats}\n')
+            f.write(f'remake_model: {remake_model}\n')
+            f.write(f'patience: {patience}\n')
+            f.write(f'min_delta: {min_delta}\n')
+            f.write(f'planktivore: {planktivore}\n')
 
-    # Plot the confusion matrix using seaborn
-    plt.figure(figsize=(10, 7))
-    sns.heatmap(cm, annot=True, fmt='g', cmap='Blues', xticklabels=set(true_labels), yticklabels=set(true_labels))
-    plt.xlabel('Predicted Label')
-    plt.ylabel('True Label')
-    plt.title('Confusion Matrix')
+        # Plot the confusion matrix using seaborn
+        plt.figure(figsize=(10, 7))
+        sns.heatmap(cm, annot=True, fmt='g', cmap='Blues', xticklabels=set(true_labels), yticklabels=set(true_labels))
+        plt.xlabel('Predicted Label')
+        plt.ylabel('True Label')
+        plt.title('Confusion Matrix')
 
-    # Save the confusion matrix as an image (use a separate filename, not args.name)
-    confusion_matrix_path = os.path.join(log_csv_path, 'confusion_matrix.png')
-    plt.savefig(confusion_matrix_path)
-    plt.close()
+        # Save the confusion matrix as an image (use a separate filename, not args.name)
+        confusion_matrix_path = os.path.join(log_csv_path, 'confusion_matrix.png')
+        plt.savefig(confusion_matrix_path)
+        plt.close()
 
-    # Count the frequencies of true and predicted labels
-    true_label_counts = df['true_label'].value_counts()
-    predicted_label_counts = df['predicted_label'].value_counts()
+        # Count the frequencies of true and predicted labels
+        true_label_counts = df['true_label'].value_counts()
+        predicted_label_counts = df['predicted_label'].value_counts()
 
-    # Create a DataFrame combining the frequencies of true and predicted labels
-    freq_df = pd.DataFrame({
-        'True Labels': true_label_counts,
-        'Predicted Labels': predicted_label_counts
-    }).fillna(0)  # Fill NaN with 0 if some labels are not predicted
+        # Create a DataFrame combining the frequencies of true and predicted labels
+        freq_df = pd.DataFrame({
+            'True Labels': true_label_counts,
+            'Predicted Labels': predicted_label_counts
+        }).fillna(0)  # Fill NaN with 0 if some labels are not predicted
 
-    # Create the frequency bar chart
-    ax = freq_df.plot(kind='bar', figsize=(10, 7), color=['blue', 'orange'])
+        # Create the frequency bar chart
+        ax = freq_df.plot(kind='bar', figsize=(10, 7), color=['blue', 'orange'])
 
-    # Add labels and title
-    plt.xlabel('Labels')
-    plt.ylabel('Frequency')
-    plt.title('Frequency of True vs Predicted Labels')
+        # Add labels and title
+        plt.xlabel('Labels')
+        plt.ylabel('Frequency')
+        plt.title('Frequency of True vs Predicted Labels')
 
-    # Save the frequency chart as an image (use a separate filename, not args.name)
-    frequency_chart_path = os.path.join(log_csv_path, 'label_frequencies.png')
-    plt.savefig(frequency_chart_path)
+        # Save the frequency chart as an image (use a separate filename, not args.name)
+        frequency_chart_path = os.path.join(log_csv_path, 'label_frequencies.png')
+        plt.savefig(frequency_chart_path)
 
-    # Close the figure to free memory
-    plt.close()
+        # Close the figure to free memory
+        plt.close()
+
+    else:
+        # Count the frequencies of true and predicted labels
+        predicted_label_counts = df['predicted_label'].value_counts()
+
+        # Create a DataFrame combining the frequencies of true and predicted labels
+        freq_df = pd.DataFrame({
+            'Predicted Labels': predicted_label_counts
+        }).fillna(0)  # Fill NaN with 0 if some labels are not predicted
+
+        # Create the frequency bar chart
+        ax = freq_df.plot(kind='bar', figsize=(10, 7), color=['blue'])
+
+        # Add labels and title
+        plt.xlabel('Labels')
+        plt.ylabel('Frequency')
+        plt.title('Frequency Predicted Labels')
+
+        # Save the frequency chart as an image (use a separate filename, not args.name)
+        frequency_chart_path = os.path.join(log_csv_path, 'label_frequencies.png')
+        plt.savefig(frequency_chart_path)
+
+        # Close the figure to free memory
+        plt.close()
