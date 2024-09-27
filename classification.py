@@ -378,8 +378,8 @@ if args.train:
         val_subset = Subset(dataset, val_index)
 
         # Create data loaders
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, pin_memory=False)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, pin_memory=False)
 
         train(model, train_loader, val_loader, train_subset, val_subset, criterion, optimizer, num_epochs=num_epochs)
 
@@ -396,8 +396,8 @@ if args.train:
         val_subset = Subset(dataset, val_index)
 
         # Create data loaders
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True, pin_memory=False)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False, pin_memory=False)
 
         train(model, train_loader, val_loader, train_subset, val_subset, criterion, optimizer, num_epochs=num_epochs)
 
