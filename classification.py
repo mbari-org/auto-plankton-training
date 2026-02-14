@@ -218,8 +218,8 @@ def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion
     Returns:
         torch.nn.Module: The trained model, potentially with early stopping applied.
     """
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
+    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    #model.to(device)
 
     # Create early stopping object to monitor validation loss
     early_stopping = EarlyStopping(patience=patience, verbose=True, delta=min_delta)
@@ -278,7 +278,7 @@ def train(model, train_loader, val_loader, train_dataset, val_dataset, criterion
               f'val loss: {val_loss:.4f}, val acc: {val_acc:.4f}')
 
         # Check if early stopping is triggered based on validation loss
-        if early_stopping(val_acc, model):
+        if early_stopping(val_loss, model):
             print("\nEarly stopping triggered, halting training.\n")
             break
 
@@ -304,8 +304,6 @@ if (not os.path.exists('{}.pth'.format(args.name)) or remake_model):
 else:
     print("Previous model found, loading {}".format(args.name))
     model = models.resnet18( weights=args.name)
-    #Modify the last layer of the model
-    model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
     model.load_state_dict(torch.load('{}.pth'.format(args.name)))
     print("Loading the model with the weights of: ", args.name)
 
@@ -334,9 +332,6 @@ if args.train:
     #Freeze all the pre-trained layers
     for param in model.parameters():
         param.requires_grad = False
-
-    #Modify the last layer of the model
-    model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 
     #Load the dataset
     dataset = ImageFolder(root = 'Training_Data', transform=transform)
